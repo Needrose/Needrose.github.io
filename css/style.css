@@ -25,7 +25,6 @@ body.no-mouse .mouse-gradient.offset {
   display: none !important;
 }
 
-/* Topbar */
 .topbar {
   position: fixed;
   top: 0; left: 0;
@@ -117,7 +116,6 @@ header .highlight:focus {
   transform: scaleX(1);
 }
 
-/* Remove hamburger menu styles */
 .hamburger,
 .hamburger span,
 .hamburger.active span:nth-child(1),
@@ -126,16 +124,12 @@ header .highlight:focus {
   display: none !important;
 }
 
-/* Mobile Navigation */
 @media (max-width: 768px) {
   .topbar .container {
     padding: 0 8px;
   }
   
-  /* .hamburger { display: flex; } -- remove */
-
   .nav-links {
-    /* Remove position, transform, etc. so nav-links are always visible */
     position: static;
     width: auto;
     max-width: none;
@@ -168,24 +162,22 @@ header .highlight:focus {
   }
 }
 
-/* Hero */
 header.hero {
   text-align: center;
   padding: 4rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.1rem; /* slightly less vertical spacing */
+  gap: 1.1rem;
 }
 
 header.hero > * {
   margin: 0;
-  padding: 0.7rem 2rem; /* Equal vertical padding for all direct children */
+  padding: 0.7rem 2rem;
   box-sizing: border-box;
 }
 
 header.hero > .btn {
-  /* Add extra margin below the button for spacing before social links */
   margin-bottom: 1rem;
 }
 
@@ -195,7 +187,6 @@ main {
   padding-top: 70px;
 }
 
-/* Buttons */
 .btn, button {
   background: var(--accent);
   color: white;
@@ -213,7 +204,6 @@ main {
   box-shadow: 0 0 20px var(--accent);
 }
 
-/* Sections */
 section {
   padding: 3rem 1.5rem;
   max-width: 960px;
@@ -236,11 +226,6 @@ section {
   transition: transform 0.3s, box-shadow 0.3s;
 }
 
-.project-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
-}
-
 @media (max-width: 768px) {
   .project-list {
     flex-direction: column;
@@ -251,7 +236,6 @@ section {
   }
 }
 
-/* Contact Form */
 form {
   display: flex;
   flex-direction: column;
@@ -267,7 +251,6 @@ input, textarea {
   font-family: var(--font);
 }
 
-/* Footer */
 footer {
   text-align: center;
   padding: 2rem;
@@ -276,18 +259,17 @@ footer {
   font-size: 0.9rem;
 }
 
-/* Custom Cursor & Background */
 .custom-cursor {
   position: fixed;
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: rgba(168, 85, 247, 0.85); /* less transparent */
+  background: rgba(168, 85, 247, 0.85);
   box-shadow: 0 0 10px rgba(168, 85, 247, 0.85);
   pointer-events: none;
   transform: translate(-50%, -50%);
   transition: background 0.2s;
-  z-index: 99999; /* Ensure cursor is above the player */
+  z-index: 99999;
 }
 
 .background {
@@ -330,7 +312,6 @@ footer {
   pointer-events: none;
 }
 
-/* Profile */
 .profile-pic-container {
   display: flex;
   justify-content: center;
@@ -360,7 +341,6 @@ footer {
   50% { transform: translateY(-12px); }
 }
 
-/* Social Links */
 .social-links {
   display: flex;
   justify-content: center;
@@ -405,11 +385,10 @@ footer {
 }
 
 .social-icon[aria-label="YouTube"]:hover { color: #ff192c; }
-.social-icon[aria-label="Roblox"]:hover { color: #305cff; }
+social-icon[aria-label="Roblox"]:hover { color: #305cff; }
 .social-icon[aria-label="GitHub"]:hover { color: #882e95; }
 .social-icon[aria-label="Discord"]:hover { color: #5865F2; }
 
-/* Typed cursor */
 #typed-cursor, .typed-cursor {
   display: inline-block;
   color: var(--accent);
@@ -420,7 +399,6 @@ footer {
   transition: opacity 0.2s;
 }
 
-/* Remove music player styles */
 #music-controls,
 #music-controls button,
 #music-title,
@@ -428,7 +406,6 @@ footer {
   display: none !important;
 }
 
-/* Remove Media Controls styles */
 .media-controls,
 .media-controls:after,
 .media-controls.dragging,
@@ -450,7 +427,6 @@ footer {
   display: none !important;
 }
 
-/* --- Audio Player Styles --- */
 .player {
   box-shadow:
     0 2px 24px 0 rgba(168, 85, 247, 0.25),
@@ -466,7 +442,7 @@ footer {
   transform: translateX(-50%);
   width: 100%;
   max-width: 445px;
-  z-index: 99998; /* Lower than .custom-cursor */
+  z-index: 99998;
   background: linear-gradient(135deg, #232336 80%, #a855f7 100%);
   border: 2px solid #a855f7;
   cursor: none !important;
@@ -558,7 +534,6 @@ footer {
   min-width: 120px;
   max-width: 120px;
   filter: brightness(0.7) blur(1px);
-  /* Remove !important so JS can update the cover */
   background-image: url("/images/star-galaxy.jpg");
   border-radius: 18px 0 0 18px;
   left: 0;
@@ -616,7 +591,6 @@ footer {
   overflow: hidden;
   position: absolute;
   width: 100%;
-  /* Remove !important so JS can update the cover */
   background-image: url("/images/star-galaxy.jpg");
   display: none !important;
 }
@@ -782,7 +756,6 @@ footer {
   outline: none;
   margin: 0;
   padding: 0;
-  /* Remove default appearance for cross-browser */
   -webkit-appearance: none;
   appearance: none;
   box-shadow: none;
@@ -791,7 +764,6 @@ footer {
   position: relative;
 }
 
-/* Track */
 .player__volume-slider input[type="range"]::-webkit-slider-runnable-track,
 .player__volume-slider--below input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
@@ -812,7 +784,6 @@ footer {
   border-radius: 999px;
 }
 
-/* Thumb */
 .player__volume-slider input[type="range"]::-webkit-slider-thumb,
 .player__volume-slider--below input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -865,19 +836,16 @@ footer {
   box-shadow: 0 0 0 4px #a855f766;
 }
 
-/* Remove outline for Firefox */
 .player__volume-slider input[type="range"]:focus,
 .player__volume-slider--below input[type="range"]:focus {
   outline: none;
 }
 
-/* Hide the outline for IE */
 .player__volume-slider input[type="range"]::-ms-tooltip,
 .player__volume-slider--below input[type="range"]::-ms-tooltip {
   display: none;
 }
 
-/* Icon font for player controls (Font Awesome 6 recommended) */
 .player__icon-list:before { content: "\f03a"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
 .player__icon-volume:before { content: "\f028"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
 .player__icon-repeat:before { content: "\f363"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
@@ -886,7 +854,6 @@ footer {
 .player__icon-next:before { content: "\f051"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
 .player__icon-shuffle:before { content: "\f074"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
 
-/* Autoplay popup styles */
 #autoplay-popup {
   pointer-events: none;
   user-select: none;
@@ -897,7 +864,5 @@ footer {
   to { opacity: 1; transform: translateY(0);}
 }
 
-/* Loader overlay (for fade-out transition) */
 #site-loader {
-  /* styles are inlined in HTML for fast paint, but you can move them here if you want */
 }

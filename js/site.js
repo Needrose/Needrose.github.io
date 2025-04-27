@@ -2,19 +2,17 @@
 let visualizerAvg = 256; // Default average for normalization
 let visualizerMax = 512; // Default max for normalization
 
-// --- Optimized Dots Preload and Visualization Prewarm ---
-(function preloadDotsAndVisualizer() {
-  function tryCreateDots() {
+// --- Efficient Dots Preload (minimal RAM, no unnecessary re-creation) ---
+(function setupDots() {
+  let lastCols = 0, lastRows = 0;
+  function createDots() {
     const dotsContainer = document.querySelector('.dots');
-    if (!dotsContainer) {
-      setTimeout(tryCreateDots, 10);
-      return;
-    }
-    // Only create if not already created
-    if (window.dotsArr && window.dotsArr.length > 0) return;
+    if (!dotsContainer) return;
     const DOT_SPACING = 30, DOT_RADIUS = 2;
     const width = window.innerWidth, height = window.innerHeight;
     const DOT_COLS = Math.ceil(width / DOT_SPACING), DOT_ROWS = Math.ceil(height / DOT_SPACING);
+    // Only recreate if grid size changed
+    if (window.dotsArr && window.dotsArr.length === DOT_COLS * DOT_ROWS) return;
     dotsContainer.innerHTML = '';
     dotsContainer.style.width = width + 'px';
     dotsContainer.style.height = height + 'px';
@@ -38,45 +36,19 @@ let visualizerMax = 512; // Default max for normalization
         window.dotsArr[idx] = dot;
       }
     }
-    // Prewarm: run a few fake visualizer frames with random data
-    prewarmVisualizer(DOT_COLS, DOT_ROWS);
-  }
-  function prewarmVisualizer(DOT_COLS, DOT_ROWS) {
-    // Simulate 10 frames of random movement for a lively initial look
-    if (!window._dotSmooth2d || window._dotSmooth2d.length !== DOT_ROWS * DOT_COLS) {
-      window._dotSmooth2d = new Float32Array(DOT_ROWS * DOT_COLS);
-    }
-    for (let frame = 0; frame < 10; frame++) {
-      for (let y = 0; y < DOT_ROWS; y++) {
-        for (let x = 0; x < DOT_COLS; x++) {
-          const idx = y * DOT_COLS + x;
-          // Simulate a plausible "mixed" value (center more active, edges less)
-          let center = Math.floor(DOT_COLS / 2);
-          let dist = Math.abs(x - center);
-          let maxDist = Math.max(center, DOT_COLS - center - 1);
-          let pitchNorm = maxDist === 0 ? 0 : dist / maxDist;
-          // Simulate a wave with a little randomness and a "bar" effect
-          let fakeNorm = Math.max(0, 1.2 - pitchNorm + (Math.random() - 0.5) * 0.2);
-          // Animate up to the fake value
-          window._dotSmooth2d[idx] += (fakeNorm - window._dotSmooth2d[idx]) * 0.22;
-          const scale = 1 + Math.max(0, Math.min(window._dotSmooth2d[idx], 1.5)) * 0.5;
-          const dot = window.dotsArr[idx];
-          if (dot) dot.style.transform = `scale(${scale})`;
-        }
-      }
-    }
+    lastCols = DOT_COLS;
+    lastRows = DOT_ROWS;
   }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', tryCreateDots);
+    document.addEventListener('DOMContentLoaded', createDots);
   } else {
-    tryCreateDots();
+    createDots();
   }
-  window.addEventListener('resize', tryCreateDots);
+  window.addEventListener('resize', createDots);
 })();
 
 function setupAudioVisualizer(audio) {
   if (!window.AudioContext) return;
-  // Only create context if not already created for this audio element
   if (!window.audioCtx || window.audioCtx.state === 'closed') {
     window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     window.audioSource = window.audioCtx.createMediaElementSource(audio);
@@ -87,9 +59,9 @@ function setupAudioVisualizer(audio) {
     window.audioDataArray = new Uint8Array(window.audioAnalyser.frequencyBinCount);
     window.audioTimeArray = new Uint8Array(window.audioAnalyser.fftSize);
   }
-  // Compute average and max for the actual value used in the visualizer (amp+wave)
-  visualizerAvg = 256; // fallback
-  visualizerMax = 512; // fallback
+
+  visualizerAvg = 256;
+  visualizerMax = 512;
   let avgSamples = [];
   let maxSamples = [];
   let avgFrames = 0;
@@ -113,7 +85,6 @@ function setupAudioVisualizer(audio) {
         let wave = window.audioTimeArray[(y * DOT_COLS + x) % window.audioTimeArray.length] || 128;
         let norm = amp / 128;
         let waveNorm = (wave - 128) / 128;
-        // Reduce sensitivity: halve the mixed value for average/max calculation
         let mixed = (norm + 0.5 * waveNorm) * 0.5;
         sum += Math.abs(mixed);
         if (Math.abs(mixed) > maxVal) maxVal = Math.abs(mixed);
@@ -126,12 +97,10 @@ function setupAudioVisualizer(audio) {
     if (avgFrames < 20) {
       requestAnimationFrame(sampleAvg);
     } else {
-      // Use median for robustness
       avgSamples.sort((a, b) => a - b);
       maxSamples.sort((a, b) => a - b);
       visualizerAvg = avgSamples[Math.floor(avgSamples.length / 2)] || 1;
-      visualizerMax = maxSamples[Math.floor(maxSamples.length * 0.95)] || 1; // 95th percentile for robustness
-      // Clamp to avoid division by zero or too small
+      visualizerMax = maxSamples[Math.floor(maxSamples.length * 0.95)] || 1;
       if (visualizerAvg < 0.1) visualizerAvg = 0.1;
       if (visualizerMax < 0.2) visualizerMax = 0.2;
     }
@@ -146,7 +115,6 @@ function animateDotsToAudio() {
   const DOT_SPACING = 30;
   if (!window.audioAnalyser || !window.dotsArr || !window.dotsArr.length) return;
 
-  // Only update frequency/time data once per frame
   window.audioAnalyser.getByteFrequencyData(window.audioDataArray);
   if (!window.audioTimeArray || window.audioTimeArray.length !== window.audioAnalyser.fftSize) {
     window.audioTimeArray = new Uint8Array(window.audioAnalyser.fftSize);
@@ -156,13 +124,11 @@ function animateDotsToAudio() {
   const DOT_COLS = Math.ceil(window.innerWidth / DOT_SPACING);
   const DOT_ROWS = Math.ceil(window.innerHeight / DOT_SPACING);
 
-  // Use a single Float32Array for smoothing, avoid reallocation
   if (!window._dotSmooth2d || window._dotSmooth2d.length !== DOT_ROWS * DOT_COLS) {
     window._dotSmooth2d = new Float32Array(DOT_ROWS * DOT_COLS);
   }
 
   const center = Math.floor(DOT_COLS / 2);
-  // Cache for performance
   const freqLen = window.audioDataArray.length;
   const timeLen = window.audioTimeArray.length;
   const maxDist = Math.max(center, DOT_COLS - center - 1);
@@ -171,6 +137,9 @@ function animateDotsToAudio() {
     const freqBin = Math.floor(((DOT_ROWS - 1 - y) / DOT_ROWS) * freqLen);
 
     for (let x = 0; x < DOT_COLS; x++) {
+      const idx = y * DOT_COLS + x;
+      const dot = window.dotsArr[idx];
+      if (!dot) continue;
       let dist = Math.abs(x - center);
       let pitchNorm = maxDist === 0 ? 0 : dist / maxDist;
       const pitchBin = Math.floor(pitchNorm * (freqLen - 1));
@@ -178,22 +147,21 @@ function animateDotsToAudio() {
       let wave = window.audioTimeArray[(y * DOT_COLS + x) % timeLen] || 128;
       let norm = amp / 128;
       let waveNorm = (wave - 128) / 128;
-      // Reduce sensitivity: halve the mixed value for visualization
       let mixed = (norm + 0.5 * waveNorm) * 0.5;
-      // Use both average and max for normalization
       let normalized = mixed / visualizerAvg;
       normalized = Math.min(normalized, visualizerMax / visualizerAvg, 2.2);
       normalized = Math.max(0, normalized);
-      const idx = y * DOT_COLS + x;
-      // Faster lerp
-      window._dotSmooth2d[idx] += (normalized - window._dotSmooth2d[idx]) * 0.22;
+
+      window._dotSmooth2d[idx] += (normalized - window._dotSmooth2d[idx]) * 0.28;
       const scale = 1 + Math.max(0, Math.min(window._dotSmooth2d[idx], 1.5)) * 0.5;
 
-      const dot = window.dotsArr[idx];
-      if (!dot) continue;
-      // Only update if scale changed significantly (perf)
-      if (!dot._lastScale || Math.abs(dot._lastScale - scale) > 0.02) {
-        dot.style.transform = `scale(${scale})`;
+      if (!dot._willChangeSet) {
+        dot.style.willChange = 'transform';
+        dot._willChangeSet = true;
+      }
+
+      if (!dot._lastScale || Math.abs(dot._lastScale - scale) > 0.03) {
+        dot.style.transform = `scale3d(${scale},${scale},1)`;
         dot._lastScale = scale;
       }
     }
@@ -233,13 +201,16 @@ document.addEventListener("DOMContentLoaded", function() {
   // dots
   const dotsContainer = document.querySelector('.dots');
   const DOT_SPACING = 30, DOT_RADIUS = 2, PUSH_RADIUS = 60, PUSH_STRENGTH = 40;
-  // Use window-scoped variables for visualizer
   window.dotsArr = [];
   window.audioAnalyser = null;
   window.audioDataArray = null;
   window.audioSource = null;
   window.audioCtx = null;
   window.animationId = null;
+
+  // --- Optimized Maze Dots ---
+  let mazeMouseX = null, mazeMouseY = null;
+  let mazeAnimFrame = null;
 
   function createMazeDots() {
     if (!dotsContainer) return;
@@ -262,42 +233,100 @@ document.addEventListener("DOMContentLoaded", function() {
         dot.style.top = `${y * DOT_SPACING}px`;
         dot.dataset.baseX = x * DOT_SPACING;
         dot.dataset.baseY = y * DOT_SPACING;
+        dot._baseX = x * DOT_SPACING;
+        dot._baseY = y * DOT_SPACING;
+        dot._offsetX = 0;
+        dot._offsetY = 0;
         dot.dataset.col = x;
         dot.dataset.row = y;
         dotsContainer.appendChild(dot);
         window.dotsArr.push(dot);
       }
     }
-    function handleMouseMove(e) {
-      const rect = dotsContainer.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      window.dotsArr.forEach(dot => {
-        const baseX = parseFloat(dot.dataset.baseX);
-        const baseY = parseFloat(dot.dataset.baseY);
-        const dx = mouseX - baseX, dy = mouseY - baseY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < PUSH_RADIUS) {
-          const angle = Math.atan2(dy, dx);
-          const push = (1 - dist / PUSH_RADIUS) * PUSH_STRENGTH;
-          dot.style.left = `${baseX - Math.cos(angle) * push}px`;
-          dot.style.top = `${baseY - Math.sin(angle) * push}px`;
-        } else {
-          dot.style.left = `${baseX}px`;
-          dot.style.top = `${baseY}px`;
-        }
-      });
-    }
-    if (window._mazeDotHandler) {
-      document.removeEventListener('mousemove', window._mazeDotHandler);
-    }
-    window._mazeDotHandler = handleMouseMove;
-    document.addEventListener('mousemove', handleMouseMove);
   }
+
+  function mazeOnMouseMove(e) {
+    const rect = dotsContainer.getBoundingClientRect();
+    mazeMouseX = e.clientX - rect.left;
+    mazeMouseY = e.clientY - rect.top;
+    if (!mazeAnimFrame) {
+      mazeAnimFrame = requestAnimationFrame(mazeAnimateDots);
+    }
+  }
+
+  function mazeAnimateDots() {
+    if (mazeMouseX === null || mazeMouseY === null) {
+      mazeAnimFrame = null;
+      return;
+    }
+    for (let i = 0; i < window.dotsArr.length; i++) {
+      const dot = window.dotsArr[i];
+      const baseX = dot._baseX, baseY = dot._baseY;
+      const dx = mazeMouseX - baseX, dy = mazeMouseY - baseY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      let targetOffsetX = 0, targetOffsetY = 0;
+      if (dist < PUSH_RADIUS) {
+        const angle = Math.atan2(dy, dx);
+        const push = (1 - dist / PUSH_RADIUS) * PUSH_STRENGTH;
+        targetOffsetX = -Math.cos(angle) * push;
+        targetOffsetY = -Math.sin(angle) * push;
+      }
+      // Smoothly interpolate offsets for a fluid effect
+      dot._offsetX += (targetOffsetX - dot._offsetX) * 0.25;
+      dot._offsetY += (targetOffsetY - dot._offsetY) * 0.25;
+      // Only update style if changed enough
+      if (
+        Math.abs(dot._offsetX) > 0.5 || Math.abs(dot._offsetY) > 0.5 ||
+        dot.style.left !== `${baseX + dot._offsetX}px` ||
+        dot.style.top !== `${baseY + dot._offsetY}px`
+      ) {
+        dot.style.left = `${baseX + dot._offsetX}px`;
+        dot.style.top = `${baseY + dot._offsetY}px`;
+      }
+    }
+    mazeAnimFrame = requestAnimationFrame(mazeAnimateDots);
+  }
+
+  function mazeOnMouseLeave() {
+    mazeMouseX = null;
+    mazeMouseY = null;
+    // Animate dots back to base positions
+    function animateBack() {
+      let stillMoving = false;
+      for (let i = 0; i < window.dotsArr.length; i++) {
+        const dot = window.dotsArr[i];
+        dot._offsetX += (0 - dot._offsetX) * 0.18;
+        dot._offsetY += (0 - dot._offsetY) * 0.18;
+        if (Math.abs(dot._offsetX) > 0.5 || Math.abs(dot._offsetY) > 0.5) {
+          stillMoving = true;
+        }
+        dot.style.left = `${dot._baseX + dot._offsetX}px`;
+        dot.style.top = `${dot._baseY + dot._offsetY}px`;
+      }
+      if (stillMoving) {
+        mazeAnimFrame = requestAnimationFrame(animateBack);
+      } else {
+        mazeAnimFrame = null;
+      }
+    }
+    if (!mazeAnimFrame) {
+      mazeAnimFrame = requestAnimationFrame(animateBack);
+    }
+  }
+
   createMazeDots();
   window.addEventListener('resize', createMazeDots);
 
-  // Detect mouse vs touch input and toggle cursor/glow
+  // Remove old handler if present
+  if (window._mazeDotHandler) {
+    document.removeEventListener('mousemove', window._mazeDotHandler);
+    dotsContainer.removeEventListener('mouseleave', window._mazeDotLeaveHandler);
+  }
+  window._mazeDotHandler = mazeOnMouseMove;
+  window._mazeDotLeaveHandler = mazeOnMouseLeave;
+  document.addEventListener('mousemove', mazeOnMouseMove);
+  dotsContainer.addEventListener('mouseleave', mazeOnMouseLeave);
+
   function enableMouseCursor() {
     document.body.classList.remove('no-mouse');
   }
@@ -305,10 +334,8 @@ document.addEventListener("DOMContentLoaded", function() {
     document.body.classList.add('no-mouse');
   }
 
-  // Default: hide cursor/glow on touch devices
   let mouseDetectionDone = false;
   function setupInputDetection() {
-    // If touch is detected first, hide cursor/glow
     window.addEventListener('touchstart', function onTouch() {
       if (!mouseDetectionDone) {
         disableMouseCursor();
@@ -316,7 +343,6 @@ document.addEventListener("DOMContentLoaded", function() {
       }
     }, { once: true, passive: true });
 
-    // If mouse is detected first, show cursor/glow
     window.addEventListener('mousemove', function onMouse() {
       if (!mouseDetectionDone) {
         enableMouseCursor();
@@ -326,14 +352,11 @@ document.addEventListener("DOMContentLoaded", function() {
   }
   setupInputDetection();
 
-  // Hide cursor/glow by default until mouse detected
   disableMouseCursor();
 });
 
-// --- FPS Counter in Topbar Center ---
 function createFPSCounter() {
   if (document.getElementById('fps-counter')) return;
-  // Place in topbar center
   const topbar = document.querySelector('.topbar .container');
   if (!topbar) return;
   let fpsDiv = document.createElement('div');
@@ -351,7 +374,6 @@ function createFPSCounter() {
   fpsDiv.style.userSelect = 'none';
   fpsDiv.style.margin = '0 18px';
   fpsDiv.innerHTML = 'FPS: <span id="fps-value">0</span>';
-  // Insert after logo, before nav-wrapper
   const logo = topbar.querySelector('.logo');
   const nav = topbar.querySelector('.nav-wrapper');
   if (logo && nav) {
@@ -378,12 +400,10 @@ createFPSCounter();
   requestAnimationFrame(loop);
 })();
 
-// --- Autoplay Popup Helper ---
 function showAutoplayPopup() {
-  // Remove any existing popup
   let old = document.getElementById('autoplay-popup');
   if (old) old.remove();
-  // Create popup
+
   const popup = document.createElement('div');
   popup.id = 'autoplay-popup';
   popup.innerHTML = `
@@ -415,9 +435,7 @@ function showAutoplayPopup() {
   }, 4000);
 }
 
-// --- Audio Player Functionality ---
 document.addEventListener("DOMContentLoaded", function() {
-  // Playlist with per-song cover art
   const playlist = [
     {
       title: "Chris",
@@ -449,22 +467,17 @@ document.addEventListener("DOMContentLoaded", function() {
       url: "/music/Windy Pines.mp3",
       cover: "/images/sasquatch.jpg"
     }
-    // Add more songs as needed
   ];
   let current = 0;
   let isPlaying = false;
   let isRepeat = false;
-  // Always shuffle on load
   let shuffledOrder = shuffleArray([...Array(playlist.length).keys()]);
 
-  // Elements
   const player = document.getElementById('audio-player');
   const audio = document.getElementById('player-audio');
   const playBtn = player.querySelector('.player__play');
   const prevBtn = player.querySelector('.player__prev');
   const nextBtn = player.querySelector('.player__next');
-  // const shuffleBtn = player.querySelector('.player__shuffle');
-  // const repeatBtn = player.querySelector('.player__repeat');
   const volumeSlider = player.querySelector('#player-volume');
   const songEl = document.getElementById('player-song');
   const artistEl = document.getElementById('player-artist');
@@ -472,24 +485,20 @@ document.addEventListener("DOMContentLoaded", function() {
   const controlsBgEl = document.getElementById('player-controls-bg');
   const coverImg = document.getElementById('player-cover-img');
 
-  // Ensure visualizer is always set up and audio context is resumed
   function ensureVisualizerAndPlay() {
     setupAudioVisualizer(audio);
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
-    // Try to play, handle autoplay block
     audio.play().catch(() => {
       showAutoplayPopup();
-      // Wait for user interaction, then try again
       const tryPlay = () => {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         audio.play().then(() => {
-          // Success: remove popup if still present
           let popup = document.getElementById('autoplay-popup');
           if (popup) popup.remove();
         }).catch(() => {
-          // Still blocked, keep popup
+
         });
         document.removeEventListener('click', tryPlay);
         document.removeEventListener('keydown', tryPlay);
@@ -506,12 +515,11 @@ document.addEventListener("DOMContentLoaded", function() {
     songEl.textContent = track.title;
     artistEl.textContent = track.artist;
     audio.src = track.url;
-    // Use per-song cover if available, fallback to default
+
     const cover = track.cover;
     if (coverImg) coverImg.src = cover;
     if (bgEl) bgEl.style.backgroundImage = `url('${cover}')`;
     if (controlsBgEl) controlsBgEl.style.backgroundImage = `url('${cover}')`;
-    // Setup visualizer for new song
     setupAudioVisualizer(audio);
   }
 
@@ -534,10 +542,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
-  // Set initial icon
   playBtn.querySelector('.player__icon-play').innerHTML = '';
 
-  // Play/Pause
   playBtn.addEventListener('click', function() {
     if (audio.paused) {
       ensureVisualizerAndPlay();
@@ -557,7 +563,6 @@ document.addEventListener("DOMContentLoaded", function() {
     updatePlayIcon();
   });
 
-  // Next/Prev
   nextBtn.addEventListener('click', function() {
     let idx = getNextIndex();
     playTrack(idx);
@@ -567,12 +572,10 @@ document.addEventListener("DOMContentLoaded", function() {
     playTrack(idx);
   });
 
-  // Volume
   volumeSlider.addEventListener('input', function() {
     audio.volume = parseFloat(volumeSlider.value);
   });
 
-  // Ended
   audio.addEventListener('ended', function() {
     if (isRepeat) {
       audio.currentTime = 0;
@@ -599,7 +602,6 @@ document.addEventListener("DOMContentLoaded", function() {
     return arr;
   }
 
-  // Shuffle and start music on load
   function startShuffledMusic() {
     shuffledOrder = shuffleArray([...Array(playlist.length).keys()]);
     current = shuffledOrder[0];
@@ -607,16 +609,13 @@ document.addEventListener("DOMContentLoaded", function() {
     ensureVisualizerAndPlay();
   }
 
-  // Initial load: shuffle and play
   startShuffledMusic();
 
-  // --- Slippery Draggable Player ---
   let isDragging = false, dragOffsetX = 0, dragOffsetY = 0;
   let targetX = null, targetY = null, animating = false;
   let dragStartOffsetX = 0, dragStartOffsetY = 0;
   let initialLeft = null, initialTop = null;
 
-  // Only allow dragging from the top meta area (not controls/buttons)
   const playerMeta = player.querySelector('.player__meta');
 
   playerMeta.addEventListener('mousedown', function(e) {
@@ -624,7 +623,6 @@ document.addEventListener("DOMContentLoaded", function() {
     isDragging = true;
     player.classList.add('dragging');
     const rect = player.getBoundingClientRect();
-    // Save the initial position and remove transform for dragging
     initialLeft = rect.left;
     initialTop = rect.top;
     player.style.left = `${initialLeft}px`;
@@ -639,17 +637,14 @@ document.addEventListener("DOMContentLoaded", function() {
     document.body.style.userSelect = 'none';
   });
 
-  // Prevent drag from controls/buttons
   player.querySelector('.player__controls').addEventListener('mousedown', function(e) {
     e.stopPropagation();
   });
 
   document.addEventListener('mousemove', function(e) {
     if (!isDragging) return;
-    // Calculate target position so the mouse stays at the same offset inside the player
     targetX = e.clientX - dragStartOffsetX;
     targetY = e.clientY - dragStartOffsetY;
-    // Clamp to viewport
     targetX = Math.max(0, Math.min(window.innerWidth - player.offsetWidth, targetX));
     targetY = Math.max(0, Math.min(window.innerHeight - player.offsetHeight, targetY));
     if (!animating) {
@@ -673,10 +668,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     const rect = player.getBoundingClientRect();
     let curX = rect.left, curY = rect.top;
-    // More slippery movement (lerp factor lower than cursor)
     let nextX = curX + (targetX - curX) * 0.18;
     let nextY = curY + (targetY - curY) * 0.18;
-    // Snap if close
     if (Math.abs(nextX - targetX) < 1) nextX = targetX;
     if (Math.abs(nextY - targetY) < 1) nextY = targetY;
     player.style.left = nextX + 'px';
@@ -694,7 +687,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
   player.addEventListener('dragstart', e => e.preventDefault());
 
-  // When not dragging, restore center position if not manually moved
   function restorePlayerToCenter() {
     if (!isDragging && (!player.style.left || player.style.left === "" || player.style.left === "50%")) {
       player.style.left = "50%";
@@ -704,5 +696,4 @@ document.addEventListener("DOMContentLoaded", function() {
       player.style.transform = "translateX(-50%)";
     }
   }
-  // Optionally, call restorePlayerToCenter() on window resize or other events if needed
 });

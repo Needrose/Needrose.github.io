@@ -4,7 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>needrose.xyz</title>
-  <!-- Preload critical resources -->
+  <meta property="og:title" content="needrose.xyz" />
+  <meta property="og:site_name" content="needrose.xyz" />
+  <meta property="og:description" content="Python and Lua Developer | Learning C++. Check out my projects and music visualizer!" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://needrose.xyz/" />
+  <meta property="og:image" content="https://needrose.xyz/images/profile.webp" />
   <link rel="preload" href="/css/style.css" as="style">
   <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" as="style">
   <link rel="preload" href="/js/site.js" as="script">
@@ -15,7 +20,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
   <style>
-    /* Loading overlay styles */
+
     #site-loader {
       position: fixed;
       z-index: 1000000;
@@ -68,7 +73,6 @@
   </style>
 </head>
 <body>
-  <!-- Loading overlay -->
   <div id="site-loader">
     <div class="loader-animation">
       <div class="loader-dots">
@@ -148,7 +152,6 @@
   </footer>
 
   <div class="player" id="audio-player">
-    <!-- Cover image as a visible img, not just background -->
     <div class="player__cover">
       <img id="player-cover-img" src="" alt="Cover" />
     </div>
@@ -172,20 +175,18 @@
         <input type="range" id="player-volume" min="0" max="1" step="0.01" value="1" aria-label="Volume" />
       </div>
     </div>
-    <!-- Keep background divs for blur effect, but hide them visually -->
     <div class="player__bg" id="player-bg" style="display:none"></div>
     <div class="player__controls-bg" id="player-controls-bg" style="display:none"></div>
     <audio id="player-audio"></audio>
   </div>
   <script src="/js/site.js"></script>
   <script>
-    // Hide loader when everything is ready
     window.addEventListener('load', function() {
       setTimeout(function() {
         const loader = document.getElementById('site-loader');
         if (loader) loader.classList.add('hide');
         setTimeout(() => { if (loader) loader.remove(); }, 700);
-      }, 200); // short delay for effect
+      }, 200);
     });
 
     document.addEventListener("DOMContentLoaded", function() {
