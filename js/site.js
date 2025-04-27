@@ -2,6 +2,51 @@
 let visualizerAvg = 256; // Default average for normalization
 let visualizerMax = 512; // Default max for normalization
 
+// --- Optimized Dots Preload ---
+(function preloadDots() {
+  function tryCreateDots() {
+    const dotsContainer = document.querySelector('.dots');
+    if (!dotsContainer) {
+      setTimeout(tryCreateDots, 10);
+      return;
+    }
+    // Only create if not already created
+    if (window.dotsArr && window.dotsArr.length > 0) return;
+    const DOT_SPACING = 30, DOT_RADIUS = 2;
+    const width = window.innerWidth, height = window.innerHeight;
+    const DOT_COLS = Math.ceil(width / DOT_SPACING), DOT_ROWS = Math.ceil(height / DOT_SPACING);
+    dotsContainer.innerHTML = '';
+    dotsContainer.style.width = width + 'px';
+    dotsContainer.style.height = height + 'px';
+    window.dotsArr = new Array(DOT_ROWS * DOT_COLS);
+    for (let y = 0; y < DOT_ROWS; y++) {
+      for (let x = 0; x < DOT_COLS; x++) {
+        const idx = y * DOT_COLS + x;
+        const dot = document.createElement('div');
+        dot.style.position = 'absolute';
+        dot.style.width = `${DOT_RADIUS * 2}px`;
+        dot.style.height = `${DOT_RADIUS * 2}px`;
+        dot.style.borderRadius = '50%';
+        dot.style.background = 'rgba(168, 85, 247, 0.10)';
+        dot.style.left = `${x * DOT_SPACING}px`;
+        dot.style.top = `${y * DOT_SPACING}px`;
+        dot.dataset.baseX = x * DOT_SPACING;
+        dot.dataset.baseY = y * DOT_SPACING;
+        dot.dataset.col = x;
+        dot.dataset.row = y;
+        dotsContainer.appendChild(dot);
+        window.dotsArr[idx] = dot;
+      }
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tryCreateDots);
+  } else {
+    tryCreateDots();
+  }
+  window.addEventListener('resize', tryCreateDots);
+})();
+
 function setupAudioVisualizer(audio) {
   if (!window.AudioContext) return;
   // Only create context if not already created for this audio element
@@ -74,6 +119,7 @@ function animateDotsToAudio() {
   const DOT_SPACING = 30;
   if (!window.audioAnalyser || !window.dotsArr || !window.dotsArr.length) return;
 
+  // Only update frequency/time data once per frame
   window.audioAnalyser.getByteFrequencyData(window.audioDataArray);
   if (!window.audioTimeArray || window.audioTimeArray.length !== window.audioAnalyser.fftSize) {
     window.audioTimeArray = new Uint8Array(window.audioAnalyser.fftSize);
@@ -83,37 +129,43 @@ function animateDotsToAudio() {
   const DOT_COLS = Math.ceil(window.innerWidth / DOT_SPACING);
   const DOT_ROWS = Math.ceil(window.innerHeight / DOT_SPACING);
 
+  // Use a single Float32Array for smoothing, avoid reallocation
   if (!window._dotSmooth2d || window._dotSmooth2d.length !== DOT_ROWS * DOT_COLS) {
     window._dotSmooth2d = new Float32Array(DOT_ROWS * DOT_COLS);
   }
 
   const center = Math.floor(DOT_COLS / 2);
+  // Cache for performance
+  const freqLen = window.audioDataArray.length;
+  const timeLen = window.audioTimeArray.length;
+  const maxDist = Math.max(center, DOT_COLS - center - 1);
+
   for (let y = 0; y < DOT_ROWS; y++) {
-    const freqBin = Math.floor(((DOT_ROWS - 1 - y) / DOT_ROWS) * window.audioDataArray.length);
+    const freqBin = Math.floor(((DOT_ROWS - 1 - y) / DOT_ROWS) * freqLen);
 
     for (let x = 0; x < DOT_COLS; x++) {
       let dist = Math.abs(x - center);
-      let maxDist = Math.max(center, DOT_COLS - center - 1);
       let pitchNorm = maxDist === 0 ? 0 : dist / maxDist;
-      const pitchBin = Math.floor(pitchNorm * (window.audioDataArray.length - 1));
-      let amp = (window.audioDataArray[freqBin] + window.audioDataArray[pitchBin]) / 2 || 0;
-      let wave = window.audioTimeArray[(y * DOT_COLS + x) % window.audioTimeArray.length] || 128;
+      const pitchBin = Math.floor(pitchNorm * (freqLen - 1));
+      let amp = (window.audioDataArray[freqBin] + window.audioDataArray[pitchBin]) * 0.5;
+      let wave = window.audioTimeArray[(y * DOT_COLS + x) % timeLen] || 128;
       let norm = amp / 128;
       let waveNorm = (wave - 128) / 128;
       // Reduce sensitivity: halve the mixed value for visualization
       let mixed = (norm + 0.5 * waveNorm) * 0.5;
       // Use both average and max for normalization
       let normalized = mixed / visualizerAvg;
-      // Clamp to max normalization (so nothing exceeds the loudest point)
       normalized = Math.min(normalized, visualizerMax / visualizerAvg, 2.2);
       normalized = Math.max(0, normalized);
       const idx = y * DOT_COLS + x;
-      window._dotSmooth2d[idx] += (normalized - window._dotSmooth2d[idx]) * 0.18;
+      // Faster lerp
+      window._dotSmooth2d[idx] += (normalized - window._dotSmooth2d[idx]) * 0.22;
       const scale = 1 + Math.max(0, Math.min(window._dotSmooth2d[idx], 1.5)) * 0.5;
 
       const dot = window.dotsArr[idx];
       if (!dot) continue;
-      if (!dot._lastScale || Math.abs(dot._lastScale - scale) > 0.01) {
+      // Only update if scale changed significantly (perf)
+      if (!dot._lastScale || Math.abs(dot._lastScale - scale) > 0.02) {
         dot.style.transform = `scale(${scale})`;
         dot._lastScale = scale;
       }
@@ -250,6 +302,54 @@ document.addEventListener("DOMContentLoaded", function() {
   // Hide cursor/glow by default until mouse detected
   disableMouseCursor();
 });
+
+// --- FPS Counter in Topbar Center ---
+function createFPSCounter() {
+  if (document.getElementById('fps-counter')) return;
+  // Place in topbar center
+  const topbar = document.querySelector('.topbar .container');
+  if (!topbar) return;
+  let fpsDiv = document.createElement('div');
+  fpsDiv.id = 'fps-counter';
+  fpsDiv.style.background = 'rgba(31,31,46,0.92)';
+  fpsDiv.style.color = '#fff';
+  fpsDiv.style.fontFamily = "'Segoe UI', sans-serif";
+  fpsDiv.style.fontSize = '1.05rem';
+  fpsDiv.style.padding = '4px 18px';
+  fpsDiv.style.borderRadius = '10px';
+  fpsDiv.style.boxShadow = '0 2px 12px 0 #a855f7aa, 0 0 0 1.5px #a855f7';
+  fpsDiv.style.zIndex = 1001;
+  fpsDiv.style.pointerEvents = 'none';
+  fpsDiv.style.opacity = '0.92';
+  fpsDiv.style.userSelect = 'none';
+  fpsDiv.style.margin = '0 18px';
+  fpsDiv.innerHTML = 'FPS: <span id="fps-value">0</span>';
+  // Insert after logo, before nav-wrapper
+  const logo = topbar.querySelector('.logo');
+  const nav = topbar.querySelector('.nav-wrapper');
+  if (logo && nav) {
+    topbar.insertBefore(fpsDiv, nav);
+  } else {
+    topbar.appendChild(fpsDiv);
+  }
+}
+createFPSCounter();
+
+(function fpsLoop() {
+  let last = performance.now(), frames = 0, fps = 0;
+  function loop(now) {
+    frames++;
+    if (now - last >= 1000) {
+      fps = frames;
+      frames = 0;
+      last = now;
+      const el = document.getElementById('fps-value');
+      if (el) el.textContent = fps;
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
 
 // --- Autoplay Popup Helper ---
 function showAutoplayPopup() {

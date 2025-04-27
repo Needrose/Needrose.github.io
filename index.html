@@ -3,12 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>needrose</title>
+  <title>needrose.xyz</title>
+  <!-- Preload critical resources -->
+  <link rel="preload" href="/css/style.css" as="style">
+  <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" as="style">
+  <link rel="preload" href="/js/site.js" as="script">
+  <link rel="preload" href="/images/profile.webp" as="image">
+  <link rel="preload" href="/images/minecraft.jpeg" as="image">
+  <link rel="preload" href="/images/sasquatch.jpg" as="image">
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
+  <style>
+    /* Loading overlay styles */
+    #site-loader {
+      position: fixed;
+      z-index: 1000000;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: linear-gradient(135deg, #1f1f2e 80%, #a855f7 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.5s;
+      opacity: 1;
+      pointer-events: all;
+    }
+    #site-loader.hide {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s;
+    }
+    .loader-animation {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+    .loader-dots {
+      display: flex;
+      gap: 12px;
+    }
+    .loader-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #a855f7;
+      opacity: 0.7;
+      animation: loader-bounce 1.2s infinite;
+    }
+    .loader-dot:nth-child(2) { animation-delay: 0.2s; }
+    .loader-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes loader-bounce {
+      0%, 80%, 100% { transform: scale(1); opacity: 0.7; }
+      40% { transform: scale(1.5); opacity: 1; }
+    }
+    .loader-text {
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 1.2rem;
+      letter-spacing: 0.04em;
+      text-shadow: 0 2px 12px #a855f7aa;
+      opacity: 0.85;
+    }
+  </style>
 </head>
 <body>
+  <!-- Loading overlay -->
+  <div id="site-loader">
+    <div class="loader-animation">
+      <div class="loader-dots">
+        <div class="loader-dot"></div>
+        <div class="loader-dot"></div>
+        <div class="loader-dot"></div>
+      </div>
+      <div class="loader-text">needrose.xyz</div>
+    </div>
+  </div>
   <nav class="topbar">
     <div class="container">
       <div class="logo" onclick="window.location.href='/'"><span class="highlight">needrose</span>.xyz</div>
@@ -109,6 +179,15 @@
   </div>
   <script src="/js/site.js"></script>
   <script>
+    // Hide loader when everything is ready
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        const loader = document.getElementById('site-loader');
+        if (loader) loader.classList.add('hide');
+        setTimeout(() => { if (loader) loader.remove(); }, 700);
+      }, 200); // short delay for effect
+    });
+
     document.addEventListener("DOMContentLoaded", function() {
       new Typed('#typed', {
         strings: [

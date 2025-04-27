@@ -896,3 +896,8 @@ footer {
   from { opacity: 0; transform: translateY(30px);}
   to { opacity: 1; transform: translateY(0);}
 }
+
+/* Loader overlay (for fade-out transition) */
+#site-loader {
+  /* styles are inlined in HTML for fast paint, but you can move them here if you want */
+}
