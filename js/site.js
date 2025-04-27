@@ -1,5 +1,6 @@
 // --- Audio Dots Animation ---
-let visualizerAvg = 128; // Default average for normalization
+let visualizerAvg = 256; // Default average for normalization
+let visualizerMax = 512; // Default max for normalization
 
 function setupAudioVisualizer(audio) {
   if (!window.AudioContext) return;
@@ -12,23 +13,55 @@ function setupAudioVisualizer(audio) {
     window.audioSource.connect(window.audioAnalyser);
     window.audioAnalyser.connect(window.audioCtx.destination);
     window.audioDataArray = new Uint8Array(window.audioAnalyser.frequencyBinCount);
+    window.audioTimeArray = new Uint8Array(window.audioAnalyser.fftSize);
   }
-  // Compute average volume for this song (over a short time)
-  visualizerAvg = 128; // fallback
+  // Compute average and max for the actual value used in the visualizer (amp+wave)
+  visualizerAvg = 256; // fallback
+  visualizerMax = 512; // fallback
   let avgSamples = [];
+  let maxSamples = [];
   let avgFrames = 0;
   function sampleAvg() {
     window.audioAnalyser.getByteFrequencyData(window.audioDataArray);
+    window.audioAnalyser.getByteTimeDomainData(window.audioTimeArray);
     let sum = 0;
-    for (let i = 0; i < window.audioDataArray.length; i++) sum += window.audioDataArray[i];
-    avgSamples.push(sum / window.audioDataArray.length);
+    let count = 0;
+    let maxVal = 0;
+    const DOT_COLS = Math.ceil(window.innerWidth / 30);
+    const DOT_ROWS = Math.ceil(window.innerHeight / 30);
+    const center = Math.floor(DOT_COLS / 2);
+    for (let y = 0; y < DOT_ROWS; y++) {
+      const freqBin = Math.floor(((DOT_ROWS - 1 - y) / DOT_ROWS) * window.audioDataArray.length);
+      for (let x = 0; x < DOT_COLS; x++) {
+        let dist = Math.abs(x - center);
+        let maxDist = Math.max(center, DOT_COLS - center - 1);
+        let pitchNorm = maxDist === 0 ? 0 : dist / maxDist;
+        const pitchBin = Math.floor(pitchNorm * (window.audioDataArray.length - 1));
+        let amp = (window.audioDataArray[freqBin] + window.audioDataArray[pitchBin]) / 2 || 0;
+        let wave = window.audioTimeArray[(y * DOT_COLS + x) % window.audioTimeArray.length] || 128;
+        let norm = amp / 128;
+        let waveNorm = (wave - 128) / 128;
+        // Reduce sensitivity: halve the mixed value for average/max calculation
+        let mixed = (norm + 0.5 * waveNorm) * 0.5;
+        sum += Math.abs(mixed);
+        if (Math.abs(mixed) > maxVal) maxVal = Math.abs(mixed);
+        count++;
+      }
+    }
+    avgSamples.push(sum / count);
+    maxSamples.push(maxVal);
     avgFrames++;
     if (avgFrames < 20) {
       requestAnimationFrame(sampleAvg);
     } else {
       // Use median for robustness
       avgSamples.sort((a, b) => a - b);
-      visualizerAvg = avgSamples[Math.floor(avgSamples.length / 2)] || 128;
+      maxSamples.sort((a, b) => a - b);
+      visualizerAvg = avgSamples[Math.floor(avgSamples.length / 2)] || 1;
+      visualizerMax = maxSamples[Math.floor(maxSamples.length * 0.95)] || 1; // 95th percentile for robustness
+      // Clamp to avoid division by zero or too small
+      if (visualizerAvg < 0.1) visualizerAvg = 0.1;
+      if (visualizerMax < 0.2) visualizerMax = 0.2;
     }
   }
   sampleAvg();
@@ -41,7 +74,6 @@ function animateDotsToAudio() {
   const DOT_SPACING = 30;
   if (!window.audioAnalyser || !window.dotsArr || !window.dotsArr.length) return;
 
-  // Only update frequency/time data once per frame
   window.audioAnalyser.getByteFrequencyData(window.audioDataArray);
   if (!window.audioTimeArray || window.audioTimeArray.length !== window.audioAnalyser.fftSize) {
     window.audioTimeArray = new Uint8Array(window.audioAnalyser.fftSize);
@@ -51,39 +83,34 @@ function animateDotsToAudio() {
   const DOT_COLS = Math.ceil(window.innerWidth / DOT_SPACING);
   const DOT_ROWS = Math.ceil(window.innerHeight / DOT_SPACING);
 
-  // Smoothing state for each dot (row x col)
   if (!window._dotSmooth2d || window._dotSmooth2d.length !== DOT_ROWS * DOT_COLS) {
     window._dotSmooth2d = new Float32Array(DOT_ROWS * DOT_COLS);
   }
 
-  // Precompute pitch bins for symmetry (center outwards)
   const center = Math.floor(DOT_COLS / 2);
   for (let y = 0; y < DOT_ROWS; y++) {
-    // Map frequency bins bottom (y=DOT_ROWS-1) to top (y=0)
     const freqBin = Math.floor(((DOT_ROWS - 1 - y) / DOT_ROWS) * window.audioDataArray.length);
 
     for (let x = 0; x < DOT_COLS; x++) {
-      // Symmetric pitch: distance from center
       let dist = Math.abs(x - center);
-      // Map 0 at center, max at edge, to pitch bin
       let maxDist = Math.max(center, DOT_COLS - center - 1);
       let pitchNorm = maxDist === 0 ? 0 : dist / maxDist;
-      // Lower pitch in center, higher at edges
       const pitchBin = Math.floor(pitchNorm * (window.audioDataArray.length - 1));
-      // Mix vertical (energy) and horizontal (pitch) for more variety
       let amp = (window.audioDataArray[freqBin] + window.audioDataArray[pitchBin]) / 2 || 0;
       let wave = window.audioTimeArray[(y * DOT_COLS + x) % window.audioTimeArray.length] || 128;
-      let norm = visualizerAvg > 0 ? amp / visualizerAvg : amp / 128;
+      let norm = amp / 128;
       let waveNorm = (wave - 128) / 128;
-      // Mix frequency, pitch, and waveform
-      let mixed = norm + 0.5 * waveNorm;
-      mixed = Math.max(0, Math.min(mixed, 2.2));
-      // Smooth with lerp per-dot
+      // Reduce sensitivity: halve the mixed value for visualization
+      let mixed = (norm + 0.5 * waveNorm) * 0.5;
+      // Use both average and max for normalization
+      let normalized = mixed / visualizerAvg;
+      // Clamp to max normalization (so nothing exceeds the loudest point)
+      normalized = Math.min(normalized, visualizerMax / visualizerAvg, 2.2);
+      normalized = Math.max(0, normalized);
       const idx = y * DOT_COLS + x;
-      window._dotSmooth2d[idx] += (mixed - window._dotSmooth2d[idx]) * 0.18;
+      window._dotSmooth2d[idx] += (normalized - window._dotSmooth2d[idx]) * 0.18;
       const scale = 1 + Math.max(0, Math.min(window._dotSmooth2d[idx], 1.5)) * 0.5;
 
-      // Only update if scale changed significantly (perf)
       const dot = window.dotsArr[idx];
       if (!dot) continue;
       if (!dot._lastScale || Math.abs(dot._lastScale - scale) > 0.01) {
