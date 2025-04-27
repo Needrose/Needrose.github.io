@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>needrose</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
+</head>
+<body>
+  <nav class="topbar">
+    <div class="container">
+      <div class="logo" onclick="window.location.href='/'"><span class="highlight">needrose</span>.xyz</div>
+      <div class="nav-wrapper">
+        <ul class="nav-links" id="navLinks">
+          <li><a href="#about" class="nav-btn">About</a></li>
+          <li><a href="#projects" class="nav-btn">Projects</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="background">
+    <div class="dots"></div>
+    <div class="mouse-gradient"></div>
+    <div class="mouse-gradient offset"></div>
+    <div class="overlay"></div>
+  </div>
+  <div class="custom-cursor"></div>
+
+  <main>
+    <header class="hero">
+      <div class="profile-pic-container">
+        <img src="/images/profile.png" alt="Profile Picture" class="profile-pic">
+      </div>
+      <h1><span id="typed"></span></h1>
+      <p>Python and Lua Developer | Learning C++</p>
+      <a href="#projects" class="btn">View Projects</a>
+      <div class="social-links">
+        <a href="https://www.youtube.com/@Needrose" class="social-icon" target="_blank" aria-label="YouTube">
+          <i class="fab fa-youtube"></i>
+        </a>
+        <a href="https://www.roblox.com/users/2025447036/profile" class="social-icon" target="_blank" aria-label="Roblox">
+          <i class="fa-solid fa-cube"></i>
+        </a>
+        <a href="https://github.com/Needrose" class="social-icon" target="_blank" aria-label="GitHub">
+          <i class="fab fa-github"></i>
+        </a>
+        <a href="https://discord.com/" class="social-icon" target="_blank" aria-label="Discord">
+          <i class="fab fa-discord"></i>
+        </a>
+      </div>
+    </header>
+
+    <section class="about" id="about">
+      <h2>About Me</h2>
+      <p>I really love to code and I want to learn more languages so bad but I've got to focus on one at a time. I think I'm pretty decent at Python. I also have a good amount of knowledge in AI and finetuning as that is one of the things I've been working on recently. Casually playing Roblox is something I like to do.</p>
+    </section>
+
+    <section class="projects" id="projects">
+      <h2>Projects</h2>
+      <div class="project-list">
+        <div class="project-card">
+          <h3>Multistrap</h3>
+          <p>This application creates a GUI using tkinter to automate the launch of multiple ROBLOX accounts. It uses Selenium to log in and save cookies, which are then used to authenticate and launch the accounts. The application allows the user to specify a Place ID, Game/Job ID, and the number of accounts to launch. It supports background threading for launching accounts with a delay between each, and can stop active ROBLOX processes. The script also handles Windows-specific message loops for continuous operation and includes error handling for common issues.</p>
+        </div>
+        <div class="project-card">
+          <h3>Random Stuff</h3>
+          <p>I've got a bunch of projects I haven't released yet because they are so janky or unfinished 😭💔</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2025 Needrose. All rights reserved.</p>
+  </footer>
+
+  <div class="player" id="audio-player">
+    <!-- Cover image as a visible img, not just background -->
+    <div class="player__cover">
+      <img id="player-cover-img" src="/images/star-galaxy.jpg" alt="Cover" />
+    </div>
+    <div class="player__meta">
+      <div class="player__song" id="player-song">Queenie Eye</div>
+      <div class="player__artist" id="player-artist">Paul McCartney — New</div>
+    </div>
+    <div class="player__controls">
+      <div class="player__controls-row">
+        <div class="player__prev">
+          <div class="player__icon player__icon-prev icon-prev"></div>
+        </div>
+        <div class="player__play">
+          <div class="player__icon player__icon-play icon-play"></div>
+        </div>
+        <div class="player__next">
+          <div class="player__icon player__icon-next icon-next"></div>
+        </div>
+      </div>
+      <div class="player__volume-slider player__volume-slider--below">
+        <input type="range" id="player-volume" min="0" max="1" step="0.01" value="1" aria-label="Volume" />
+      </div>
+    </div>
+    <!-- Keep background divs for blur effect, but hide them visually -->
+    <div class="player__bg" id="player-bg" style="display:none"></div>
+    <div class="player__controls-bg" id="player-controls-bg" style="display:none"></div>
+    <audio id="player-audio"></audio>
+  </div>
+  <script src="/js/site.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      new Typed('#typed', {
+        strings: [
+          'Hi,^800 I\'m <span class="highlight">Needrose</span>'
+        ],
+        typeSpeed: 70,
+        showCursor: true,
+        cursorChar: '|',
+        startDelay: 200,
+        contentType: 'html'
+      });
+    });
+  </script>
+</body>
+</html>
