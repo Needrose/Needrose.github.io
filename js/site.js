@@ -243,8 +243,18 @@ document.addEventListener("DOMContentLoaded", function() {
     return arr;
   }
 
-  // Initial load
-  updatePlayer(current);
+  // Shuffle and start music on load
+  function startShuffledMusic() {
+    shuffledOrder = shuffleArray([...Array(playlist.length).keys()]);
+    current = shuffledOrder[0];
+    updatePlayer(current);
+    audio.play();
+    isPlaying = true;
+    updatePlayIcon();
+  }
+
+  // Initial load: shuffle and play
+  startShuffledMusic();
 
   // --- Slippery Draggable Player ---
   let isDragging = false, dragOffsetX = 0, dragOffsetY = 0;
