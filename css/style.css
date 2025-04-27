@@ -19,6 +19,12 @@ body {
   cursor: none;
 }
 
+body.no-mouse .custom-cursor,
+body.no-mouse .mouse-gradient,
+body.no-mouse .mouse-gradient.offset {
+  display: none !important;
+}
+
 /* Topbar */
 .topbar {
   position: fixed;

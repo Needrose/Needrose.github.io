@@ -1,3 +1,100 @@
+// --- Audio Dots Animation ---
+let visualizerAvg = 128; // Default average for normalization
+
+function setupAudioVisualizer(audio) {
+  if (!window.AudioContext) return;
+  // Only create context if not already created for this audio element
+  if (!window.audioCtx || window.audioCtx.state === 'closed') {
+    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    window.audioSource = window.audioCtx.createMediaElementSource(audio);
+    window.audioAnalyser = window.audioCtx.createAnalyser();
+    window.audioAnalyser.fftSize = 128;
+    window.audioSource.connect(window.audioAnalyser);
+    window.audioAnalyser.connect(window.audioCtx.destination);
+    window.audioDataArray = new Uint8Array(window.audioAnalyser.frequencyBinCount);
+  }
+  // Compute average volume for this song (over a short time)
+  visualizerAvg = 128; // fallback
+  let avgSamples = [];
+  let avgFrames = 0;
+  function sampleAvg() {
+    window.audioAnalyser.getByteFrequencyData(window.audioDataArray);
+    let sum = 0;
+    for (let i = 0; i < window.audioDataArray.length; i++) sum += window.audioDataArray[i];
+    avgSamples.push(sum / window.audioDataArray.length);
+    avgFrames++;
+    if (avgFrames < 20) {
+      requestAnimationFrame(sampleAvg);
+    } else {
+      // Use median for robustness
+      avgSamples.sort((a, b) => a - b);
+      visualizerAvg = avgSamples[Math.floor(avgSamples.length / 2)] || 128;
+    }
+  }
+  sampleAvg();
+
+  if (window.animationId) cancelAnimationFrame(window.animationId);
+  animateDotsToAudio();
+}
+
+function animateDotsToAudio() {
+  const DOT_SPACING = 30;
+  if (!window.audioAnalyser || !window.dotsArr || !window.dotsArr.length) return;
+
+  // Only update frequency/time data once per frame
+  window.audioAnalyser.getByteFrequencyData(window.audioDataArray);
+  if (!window.audioTimeArray || window.audioTimeArray.length !== window.audioAnalyser.fftSize) {
+    window.audioTimeArray = new Uint8Array(window.audioAnalyser.fftSize);
+  }
+  window.audioAnalyser.getByteTimeDomainData(window.audioTimeArray);
+
+  const DOT_COLS = Math.ceil(window.innerWidth / DOT_SPACING);
+  const DOT_ROWS = Math.ceil(window.innerHeight / DOT_SPACING);
+
+  // Smoothing state for each dot (row x col)
+  if (!window._dotSmooth2d || window._dotSmooth2d.length !== DOT_ROWS * DOT_COLS) {
+    window._dotSmooth2d = new Float32Array(DOT_ROWS * DOT_COLS);
+  }
+
+  // Precompute pitch bins for symmetry (center outwards)
+  const center = Math.floor(DOT_COLS / 2);
+  for (let y = 0; y < DOT_ROWS; y++) {
+    // Map frequency bins bottom (y=DOT_ROWS-1) to top (y=0)
+    const freqBin = Math.floor(((DOT_ROWS - 1 - y) / DOT_ROWS) * window.audioDataArray.length);
+
+    for (let x = 0; x < DOT_COLS; x++) {
+      // Symmetric pitch: distance from center
+      let dist = Math.abs(x - center);
+      // Map 0 at center, max at edge, to pitch bin
+      let maxDist = Math.max(center, DOT_COLS - center - 1);
+      let pitchNorm = maxDist === 0 ? 0 : dist / maxDist;
+      // Lower pitch in center, higher at edges
+      const pitchBin = Math.floor(pitchNorm * (window.audioDataArray.length - 1));
+      // Mix vertical (energy) and horizontal (pitch) for more variety
+      let amp = (window.audioDataArray[freqBin] + window.audioDataArray[pitchBin]) / 2 || 0;
+      let wave = window.audioTimeArray[(y * DOT_COLS + x) % window.audioTimeArray.length] || 128;
+      let norm = visualizerAvg > 0 ? amp / visualizerAvg : amp / 128;
+      let waveNorm = (wave - 128) / 128;
+      // Mix frequency, pitch, and waveform
+      let mixed = norm + 0.5 * waveNorm;
+      mixed = Math.max(0, Math.min(mixed, 2.2));
+      // Smooth with lerp per-dot
+      const idx = y * DOT_COLS + x;
+      window._dotSmooth2d[idx] += (mixed - window._dotSmooth2d[idx]) * 0.18;
+      const scale = 1 + Math.max(0, Math.min(window._dotSmooth2d[idx], 1.5)) * 0.5;
+
+      // Only update if scale changed significantly (perf)
+      const dot = window.dotsArr[idx];
+      if (!dot) continue;
+      if (!dot._lastScale || Math.abs(dot._lastScale - scale) > 0.01) {
+        dot.style.transform = `scale(${scale})`;
+        dot._lastScale = scale;
+      }
+    }
+  }
+  window.animationId = requestAnimationFrame(animateDotsToAudio);
+}
+
 document.addEventListener("DOMContentLoaded", function() {
   // gradient
   document.addEventListener("mousemove", (e) => {
@@ -30,7 +127,13 @@ document.addEventListener("DOMContentLoaded", function() {
   // dots
   const dotsContainer = document.querySelector('.dots');
   const DOT_SPACING = 30, DOT_RADIUS = 2, PUSH_RADIUS = 60, PUSH_STRENGTH = 40;
-  let dotsArr = [];
+  // Use window-scoped variables for visualizer
+  window.dotsArr = [];
+  window.audioAnalyser = null;
+  window.audioDataArray = null;
+  window.audioSource = null;
+  window.audioCtx = null;
+  window.animationId = null;
 
   function createMazeDots() {
     if (!dotsContainer) return;
@@ -40,7 +143,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const DOT_COLS = Math.ceil(width / DOT_SPACING), DOT_ROWS = Math.ceil(height / DOT_SPACING);
     dotsContainer.style.width = width + 'px';
     dotsContainer.style.height = height + 'px';
-    dotsArr = [];
+    window.dotsArr = [];
     for (let y = 0; y < DOT_ROWS; y++) {
       for (let x = 0; x < DOT_COLS; x++) {
         const dot = document.createElement('div');
@@ -53,15 +156,17 @@ document.addEventListener("DOMContentLoaded", function() {
         dot.style.top = `${y * DOT_SPACING}px`;
         dot.dataset.baseX = x * DOT_SPACING;
         dot.dataset.baseY = y * DOT_SPACING;
+        dot.dataset.col = x;
+        dot.dataset.row = y;
         dotsContainer.appendChild(dot);
-        dotsArr.push(dot);
+        window.dotsArr.push(dot);
       }
     }
     function handleMouseMove(e) {
       const rect = dotsContainer.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      dotsArr.forEach(dot => {
+      window.dotsArr.forEach(dot => {
         const baseX = parseFloat(dot.dataset.baseX);
         const baseY = parseFloat(dot.dataset.baseY);
         const dx = mouseX - baseX, dy = mouseY - baseY;
@@ -85,6 +190,38 @@ document.addEventListener("DOMContentLoaded", function() {
   }
   createMazeDots();
   window.addEventListener('resize', createMazeDots);
+
+  // Detect mouse vs touch input and toggle cursor/glow
+  function enableMouseCursor() {
+    document.body.classList.remove('no-mouse');
+  }
+  function disableMouseCursor() {
+    document.body.classList.add('no-mouse');
+  }
+
+  // Default: hide cursor/glow on touch devices
+  let mouseDetectionDone = false;
+  function setupInputDetection() {
+    // If touch is detected first, hide cursor/glow
+    window.addEventListener('touchstart', function onTouch() {
+      if (!mouseDetectionDone) {
+        disableMouseCursor();
+        mouseDetectionDone = true;
+      }
+    }, { once: true, passive: true });
+
+    // If mouse is detected first, show cursor/glow
+    window.addEventListener('mousemove', function onMouse() {
+      if (!mouseDetectionDone) {
+        enableMouseCursor();
+        mouseDetectionDone = true;
+      }
+    }, { once: true, passive: true });
+  }
+  setupInputDetection();
+
+  // Hide cursor/glow by default until mouse detected
+  disableMouseCursor();
 });
 
 // --- Audio Player Functionality ---
@@ -144,24 +281,45 @@ document.addEventListener("DOMContentLoaded", function() {
   const controlsBgEl = document.getElementById('player-controls-bg');
   const coverImg = document.getElementById('player-cover-img');
 
+  // Ensure visualizer is always set up and audio context is resumed
+  function ensureVisualizerAndPlay() {
+    setupAudioVisualizer(audio);
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    audio.play().catch(() => {
+      // Autoplay blocked, wait for user interaction
+      const tryPlay = () => {
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        audio.play();
+        document.removeEventListener('click', tryPlay);
+        document.removeEventListener('keydown', tryPlay);
+      };
+      document.addEventListener('click', tryPlay);
+      document.addEventListener('keydown', tryPlay);
+    });
+    isPlaying = true;
+    updatePlayIcon();
+  }
+
   function updatePlayer(idx) {
     const track = playlist[idx];
     songEl.textContent = track.title;
     artistEl.textContent = track.artist;
     audio.src = track.url;
     // Use per-song cover if available, fallback to default
-    const cover = track.cover || "/images/star-galaxy.jpg";
+    const cover = track.cover;
     if (coverImg) coverImg.src = cover;
     if (bgEl) bgEl.style.backgroundImage = `url('${cover}')`;
     if (controlsBgEl) controlsBgEl.style.backgroundImage = `url('${cover}')`;
+    // Setup visualizer for new song
+    setupAudioVisualizer(audio);
   }
 
   function playTrack(idx) {
     current = idx;
     updatePlayer(current);
-    audio.play();
-    isPlaying = true;
-    updatePlayIcon();
+    ensureVisualizerAndPlay();
   }
 
   function updatePlayIcon() {
@@ -183,13 +341,12 @@ document.addEventListener("DOMContentLoaded", function() {
   // Play/Pause
   playBtn.addEventListener('click', function() {
     if (audio.paused) {
-      audio.play();
-      isPlaying = true;
+      ensureVisualizerAndPlay();
     } else {
       audio.pause();
       isPlaying = false;
+      updatePlayIcon();
     }
-    updatePlayIcon();
   });
 
   audio.addEventListener('play', function() {
@@ -248,9 +405,7 @@ document.addEventListener("DOMContentLoaded", function() {
     shuffledOrder = shuffleArray([...Array(playlist.length).keys()]);
     current = shuffledOrder[0];
     updatePlayer(current);
-    audio.play();
-    isPlaying = true;
-    updatePlayIcon();
+    ensureVisualizerAndPlay();
   }
 
   // Initial load: shuffle and play
@@ -260,6 +415,7 @@ document.addEventListener("DOMContentLoaded", function() {
   let isDragging = false, dragOffsetX = 0, dragOffsetY = 0;
   let targetX = null, targetY = null, animating = false;
   let dragStartOffsetX = 0, dragStartOffsetY = 0;
+  let initialLeft = null, initialTop = null;
 
   // Only allow dragging from the top meta area (not controls/buttons)
   const playerMeta = player.querySelector('.player__meta');
@@ -269,10 +425,16 @@ document.addEventListener("DOMContentLoaded", function() {
     isDragging = true;
     player.classList.add('dragging');
     const rect = player.getBoundingClientRect();
-    // Use mouse position relative to the top-left of the player
+    // Save the initial position and remove transform for dragging
+    initialLeft = rect.left;
+    initialTop = rect.top;
+    player.style.left = `${initialLeft}px`;
+    player.style.top = `${initialTop}px`;
+    player.style.right = 'auto';
+    player.style.bottom = 'auto';
+    player.style.transform = 'none';
     dragStartOffsetX = e.clientX - rect.left;
     dragStartOffsetY = e.clientY - rect.top;
-    // Set target to current position
     targetX = rect.left;
     targetY = rect.top;
     document.body.style.userSelect = 'none';
@@ -323,6 +485,7 @@ document.addEventListener("DOMContentLoaded", function() {
     player.style.right = 'auto';
     player.style.bottom = 'auto';
     player.style.position = 'fixed';
+    player.style.transform = 'none';
     if ((nextX !== targetX || nextY !== targetY) && (isDragging || (Math.abs(nextX - targetX) > 0.5 || Math.abs(nextY - targetY) > 0.5))) {
       requestAnimationFrame(animatePlayer);
     } else {
@@ -331,4 +494,16 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   player.addEventListener('dragstart', e => e.preventDefault());
+
+  // When not dragging, restore center position if not manually moved
+  function restorePlayerToCenter() {
+    if (!isDragging && (!player.style.left || player.style.left === "" || player.style.left === "50%")) {
+      player.style.left = "50%";
+      player.style.bottom = "40px";
+      player.style.top = "";
+      player.style.right = "";
+      player.style.transform = "translateX(-50%)";
+    }
+  }
+  // Optionally, call restorePlayerToCenter() on window resize or other events if needed
 });
