@@ -1,8 +1,5 @@
-// --- Audio Dots Animation ---
-let visualizerAvg = 256; // Default average for normalization
-let visualizerMax = 512; // Default max for normalization
-
-// --- Efficient Dots Preload (minimal RAM, no unnecessary re-creation) ---
+let visualizerAvg = 256; 
+let visualizerMax = 512; 
 (function setupDots() {
   let lastCols = 0, lastRows = 0;
   function createDots() {
@@ -11,7 +8,6 @@ let visualizerMax = 512; // Default max for normalization
     const DOT_SPACING = 30, DOT_RADIUS = 2;
     const width = window.innerWidth, height = window.innerHeight;
     const DOT_COLS = Math.ceil(width / DOT_SPACING), DOT_ROWS = Math.ceil(height / DOT_SPACING);
-    // Only recreate if grid size changed
     if (window.dotsArr && window.dotsArr.length === DOT_COLS * DOT_ROWS) return;
     dotsContainer.innerHTML = '';
     dotsContainer.style.width = width + 'px';
@@ -46,7 +42,6 @@ let visualizerMax = 512; // Default max for normalization
   }
   window.addEventListener('resize', createDots);
 })();
-
 function setupAudioVisualizer(audio) {
   if (!window.AudioContext) return;
   if (!window.audioCtx || window.audioCtx.state === 'closed') {
@@ -59,7 +54,6 @@ function setupAudioVisualizer(audio) {
     window.audioDataArray = new Uint8Array(window.audioAnalyser.frequencyBinCount);
     window.audioTimeArray = new Uint8Array(window.audioAnalyser.fftSize);
   }
-
   visualizerAvg = 256;
   visualizerMax = 512;
   let avgSamples = [];
@@ -106,36 +100,28 @@ function setupAudioVisualizer(audio) {
     }
   }
   sampleAvg();
-
   if (window.animationId) cancelAnimationFrame(window.animationId);
   animateDotsToAudio();
 }
-
 function animateDotsToAudio() {
   const DOT_SPACING = 30;
   if (!window.audioAnalyser || !window.dotsArr || !window.dotsArr.length) return;
-
   window.audioAnalyser.getByteFrequencyData(window.audioDataArray);
   if (!window.audioTimeArray || window.audioTimeArray.length !== window.audioAnalyser.fftSize) {
     window.audioTimeArray = new Uint8Array(window.audioAnalyser.fftSize);
   }
   window.audioAnalyser.getByteTimeDomainData(window.audioTimeArray);
-
   const DOT_COLS = Math.ceil(window.innerWidth / DOT_SPACING);
   const DOT_ROWS = Math.ceil(window.innerHeight / DOT_SPACING);
-
   if (!window._dotSmooth2d || window._dotSmooth2d.length !== DOT_ROWS * DOT_COLS) {
     window._dotSmooth2d = new Float32Array(DOT_ROWS * DOT_COLS);
   }
-
   const center = Math.floor(DOT_COLS / 2);
   const freqLen = window.audioDataArray.length;
   const timeLen = window.audioTimeArray.length;
   const maxDist = Math.max(center, DOT_COLS - center - 1);
-
   for (let y = 0; y < DOT_ROWS; y++) {
     const freqBin = Math.floor(((DOT_ROWS - 1 - y) / DOT_ROWS) * freqLen);
-
     for (let x = 0; x < DOT_COLS; x++) {
       const idx = y * DOT_COLS + x;
       const dot = window.dotsArr[idx];
@@ -151,15 +137,12 @@ function animateDotsToAudio() {
       let normalized = mixed / visualizerAvg;
       normalized = Math.min(normalized, visualizerMax / visualizerAvg, 2.2);
       normalized = Math.max(0, normalized);
-
       window._dotSmooth2d[idx] += (normalized - window._dotSmooth2d[idx]) * 0.28;
       const scale = 1 + Math.max(0, Math.min(window._dotSmooth2d[idx], 1.5)) * 0.5;
-
       if (!dot._willChangeSet) {
         dot.style.willChange = 'transform';
         dot._willChangeSet = true;
       }
-
       if (!dot._lastScale || Math.abs(dot._lastScale - scale) > 0.03) {
         dot.style.transform = `scale3d(${scale},${scale},1)`;
         dot._lastScale = scale;
@@ -168,9 +151,7 @@ function animateDotsToAudio() {
   }
   window.animationId = requestAnimationFrame(animateDotsToAudio);
 }
-
 document.addEventListener("DOMContentLoaded", function() {
-  // gradient
   document.addEventListener("mousemove", (e) => {
     const x = (e.clientX / window.innerWidth) * 100;
     const y = (e.clientY / window.innerHeight) * 100;
@@ -179,8 +160,6 @@ document.addEventListener("DOMContentLoaded", function() {
       layer.style.setProperty("--mouse-y", `${y}%`);
     });
   });
-
-  // cursor
   const customCursor = document.querySelector(".custom-cursor");
   let mouseX = 0, mouseY = 0, cursorX = 0, cursorY = 0;
   document.addEventListener("mousemove", (e) => {
@@ -197,8 +176,6 @@ document.addEventListener("DOMContentLoaded", function() {
     requestAnimationFrame(animateCursor);
   }
   animateCursor();
-
-  // dots
   const dotsContainer = document.querySelector('.dots');
   const DOT_SPACING = 30, DOT_RADIUS = 2, PUSH_RADIUS = 60, PUSH_STRENGTH = 40;
   window.dotsArr = [];
@@ -207,11 +184,8 @@ document.addEventListener("DOMContentLoaded", function() {
   window.audioSource = null;
   window.audioCtx = null;
   window.animationId = null;
-
-  // --- Optimized Maze Dots ---
   let mazeMouseX = null, mazeMouseY = null;
   let mazeAnimFrame = null;
-
   function createMazeDots() {
     if (!dotsContainer) return;
     dotsContainer.innerHTML = '';
@@ -244,7 +218,6 @@ document.addEventListener("DOMContentLoaded", function() {
       }
     }
   }
-
   function mazeOnMouseMove(e) {
     const rect = dotsContainer.getBoundingClientRect();
     mazeMouseX = e.clientX - rect.left;
@@ -253,7 +226,6 @@ document.addEventListener("DOMContentLoaded", function() {
       mazeAnimFrame = requestAnimationFrame(mazeAnimateDots);
     }
   }
-
   function mazeAnimateDots() {
     if (mazeMouseX === null || mazeMouseY === null) {
       mazeAnimFrame = null;
@@ -271,10 +243,8 @@ document.addEventListener("DOMContentLoaded", function() {
         targetOffsetX = -Math.cos(angle) * push;
         targetOffsetY = -Math.sin(angle) * push;
       }
-      // Smoothly interpolate offsets for a fluid effect
       dot._offsetX += (targetOffsetX - dot._offsetX) * 0.25;
       dot._offsetY += (targetOffsetY - dot._offsetY) * 0.25;
-      // Only update style if changed enough
       if (
         Math.abs(dot._offsetX) > 0.5 || Math.abs(dot._offsetY) > 0.5 ||
         dot.style.left !== `${baseX + dot._offsetX}px` ||
@@ -286,11 +256,9 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     mazeAnimFrame = requestAnimationFrame(mazeAnimateDots);
   }
-
   function mazeOnMouseLeave() {
     mazeMouseX = null;
     mazeMouseY = null;
-    // Animate dots back to base positions
     function animateBack() {
       let stillMoving = false;
       for (let i = 0; i < window.dotsArr.length; i++) {
@@ -313,11 +281,8 @@ document.addEventListener("DOMContentLoaded", function() {
       mazeAnimFrame = requestAnimationFrame(animateBack);
     }
   }
-
   createMazeDots();
   window.addEventListener('resize', createMazeDots);
-
-  // Remove old handler if present
   if (window._mazeDotHandler) {
     document.removeEventListener('mousemove', window._mazeDotHandler);
     dotsContainer.removeEventListener('mouseleave', window._mazeDotLeaveHandler);
@@ -326,14 +291,12 @@ document.addEventListener("DOMContentLoaded", function() {
   window._mazeDotLeaveHandler = mazeOnMouseLeave;
   document.addEventListener('mousemove', mazeOnMouseMove);
   dotsContainer.addEventListener('mouseleave', mazeOnMouseLeave);
-
   function enableMouseCursor() {
     document.body.classList.remove('no-mouse');
   }
   function disableMouseCursor() {
     document.body.classList.add('no-mouse');
   }
-
   let mouseDetectionDone = false;
   function setupInputDetection() {
     window.addEventListener('touchstart', function onTouch() {
@@ -342,7 +305,6 @@ document.addEventListener("DOMContentLoaded", function() {
         mouseDetectionDone = true;
       }
     }, { once: true, passive: true });
-
     window.addEventListener('mousemove', function onMouse() {
       if (!mouseDetectionDone) {
         enableMouseCursor();
@@ -351,10 +313,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }, { once: true, passive: true });
   }
   setupInputDetection();
-
   disableMouseCursor();
 });
-
 function createFPSCounter() {
   if (document.getElementById('fps-counter')) return;
   const topbar = document.querySelector('.topbar .container');
@@ -383,7 +343,6 @@ function createFPSCounter() {
   }
 }
 createFPSCounter();
-
 (function fpsLoop() {
   let last = performance.now(), frames = 0, fps = 0;
   function loop(now) {
@@ -399,11 +358,9 @@ createFPSCounter();
   }
   requestAnimationFrame(loop);
 })();
-
 function showAutoplayPopup() {
   let old = document.getElementById('autoplay-popup');
   if (old) old.remove();
-
   const popup = document.createElement('div');
   popup.id = 'autoplay-popup';
   popup.innerHTML = `
@@ -426,7 +383,6 @@ function showAutoplayPopup() {
   popup.style.gap = '8px';
   popup.style.opacity = '0';
   popup.style.transition = 'opacity 0.4s';
-
   document.body.appendChild(popup);
   setTimeout(() => { popup.style.opacity = '1'; }, 10);
   setTimeout(() => {
@@ -434,7 +390,6 @@ function showAutoplayPopup() {
     setTimeout(() => popup.remove(), 600);
   }, 4000);
 }
-
 document.addEventListener("DOMContentLoaded", function() {
   const playlist = [
     {
@@ -472,7 +427,6 @@ document.addEventListener("DOMContentLoaded", function() {
   let isPlaying = false;
   let isRepeat = false;
   let shuffledOrder = shuffleArray([...Array(playlist.length).keys()]);
-
   const player = document.getElementById('audio-player');
   const audio = document.getElementById('player-audio');
   const playBtn = player.querySelector('.player__play');
@@ -484,7 +438,6 @@ document.addEventListener("DOMContentLoaded", function() {
   const bgEl = document.getElementById('player-bg');
   const controlsBgEl = document.getElementById('player-controls-bg');
   const coverImg = document.getElementById('player-cover-img');
-
   function ensureVisualizerAndPlay() {
     setupAudioVisualizer(audio);
     if (audioCtx && audioCtx.state === 'suspended') {
@@ -498,7 +451,6 @@ document.addEventListener("DOMContentLoaded", function() {
           let popup = document.getElementById('autoplay-popup');
           if (popup) popup.remove();
         }).catch(() => {
-
         });
         document.removeEventListener('click', tryPlay);
         document.removeEventListener('keydown', tryPlay);
@@ -509,26 +461,22 @@ document.addEventListener("DOMContentLoaded", function() {
     isPlaying = true;
     updatePlayIcon();
   }
-
   function updatePlayer(idx) {
     const track = playlist[idx];
     songEl.textContent = track.title;
     artistEl.textContent = track.artist;
     audio.src = track.url;
-
     const cover = track.cover;
     if (coverImg) coverImg.src = cover;
     if (bgEl) bgEl.style.backgroundImage = `url('${cover}')`;
     if (controlsBgEl) controlsBgEl.style.backgroundImage = `url('${cover}')`;
     setupAudioVisualizer(audio);
   }
-
   function playTrack(idx) {
     current = idx;
     updatePlayer(current);
     ensureVisualizerAndPlay();
   }
-
   function updatePlayIcon() {
     const icon = playBtn.querySelector('.player__icon-play');
     if (isPlaying) {
@@ -541,9 +489,7 @@ document.addEventListener("DOMContentLoaded", function() {
       icon.innerHTML = '';
     }
   }
-
   playBtn.querySelector('.player__icon-play').innerHTML = '';
-
   playBtn.addEventListener('click', function() {
     if (audio.paused) {
       ensureVisualizerAndPlay();
@@ -553,7 +499,6 @@ document.addEventListener("DOMContentLoaded", function() {
       updatePlayIcon();
     }
   });
-
   audio.addEventListener('play', function() {
     isPlaying = true;
     updatePlayIcon();
@@ -562,7 +507,6 @@ document.addEventListener("DOMContentLoaded", function() {
     isPlaying = false;
     updatePlayIcon();
   });
-
   nextBtn.addEventListener('click', function() {
     let idx = getNextIndex();
     playTrack(idx);
@@ -571,11 +515,9 @@ document.addEventListener("DOMContentLoaded", function() {
     let idx = getPrevIndex();
     playTrack(idx);
   });
-
   volumeSlider.addEventListener('input', function() {
     audio.volume = parseFloat(volumeSlider.value);
   });
-
   audio.addEventListener('ended', function() {
     if (isRepeat) {
       audio.currentTime = 0;
@@ -585,7 +527,6 @@ document.addEventListener("DOMContentLoaded", function() {
       playTrack(idx);
     }
   });
-
   function getNextIndex() {
     let idx = shuffledOrder.indexOf(current);
     return shuffledOrder[(idx + 1) % shuffledOrder.length];
@@ -601,23 +542,18 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     return arr;
   }
-
   function startShuffledMusic() {
     shuffledOrder = shuffleArray([...Array(playlist.length).keys()]);
     current = shuffledOrder[0];
     updatePlayer(current);
     ensureVisualizerAndPlay();
   }
-
   startShuffledMusic();
-
   let isDragging = false, dragOffsetX = 0, dragOffsetY = 0;
   let targetX = null, targetY = null, animating = false;
   let dragStartOffsetX = 0, dragStartOffsetY = 0;
   let initialLeft = null, initialTop = null;
-
   const playerMeta = player.querySelector('.player__meta');
-
   playerMeta.addEventListener('mousedown', function(e) {
     if (e.button !== 0) return;
     isDragging = true;
@@ -636,11 +572,9 @@ document.addEventListener("DOMContentLoaded", function() {
     targetY = rect.top;
     document.body.style.userSelect = 'none';
   });
-
   player.querySelector('.player__controls').addEventListener('mousedown', function(e) {
     e.stopPropagation();
   });
-
   document.addEventListener('mousemove', function(e) {
     if (!isDragging) return;
     targetX = e.clientX - dragStartOffsetX;
@@ -652,7 +586,6 @@ document.addEventListener("DOMContentLoaded", function() {
       requestAnimationFrame(animatePlayer);
     }
   });
-
   document.addEventListener('mouseup', function() {
     if (isDragging) {
       isDragging = false;
@@ -660,7 +593,6 @@ document.addEventListener("DOMContentLoaded", function() {
       document.body.style.userSelect = '';
     }
   });
-
   function animatePlayer() {
     if (targetX === null || targetY === null) {
       animating = false;
@@ -684,9 +616,7 @@ document.addEventListener("DOMContentLoaded", function() {
       animating = false;
     }
   }
-
   player.addEventListener('dragstart', e => e.preventDefault());
-
   function restorePlayerToCenter() {
     if (!isDragging && (!player.style.left || player.style.left === "" || player.style.left === "50%")) {
       player.style.left = "50%";
