@@ -2,8 +2,8 @@
 let visualizerAvg = 256; // Default average for normalization
 let visualizerMax = 512; // Default max for normalization
 
-// --- Optimized Dots Preload ---
-(function preloadDots() {
+// --- Optimized Dots Preload and Visualization Prewarm ---
+(function preloadDotsAndVisualizer() {
   function tryCreateDots() {
     const dotsContainer = document.querySelector('.dots');
     if (!dotsContainer) {
@@ -36,6 +36,33 @@ let visualizerMax = 512; // Default max for normalization
         dot.dataset.row = y;
         dotsContainer.appendChild(dot);
         window.dotsArr[idx] = dot;
+      }
+    }
+    // Prewarm: run a few fake visualizer frames with random data
+    prewarmVisualizer(DOT_COLS, DOT_ROWS);
+  }
+  function prewarmVisualizer(DOT_COLS, DOT_ROWS) {
+    // Simulate 10 frames of random movement for a lively initial look
+    if (!window._dotSmooth2d || window._dotSmooth2d.length !== DOT_ROWS * DOT_COLS) {
+      window._dotSmooth2d = new Float32Array(DOT_ROWS * DOT_COLS);
+    }
+    for (let frame = 0; frame < 10; frame++) {
+      for (let y = 0; y < DOT_ROWS; y++) {
+        for (let x = 0; x < DOT_COLS; x++) {
+          const idx = y * DOT_COLS + x;
+          // Simulate a plausible "mixed" value (center more active, edges less)
+          let center = Math.floor(DOT_COLS / 2);
+          let dist = Math.abs(x - center);
+          let maxDist = Math.max(center, DOT_COLS - center - 1);
+          let pitchNorm = maxDist === 0 ? 0 : dist / maxDist;
+          // Simulate a wave with a little randomness and a "bar" effect
+          let fakeNorm = Math.max(0, 1.2 - pitchNorm + (Math.random() - 0.5) * 0.2);
+          // Animate up to the fake value
+          window._dotSmooth2d[idx] += (fakeNorm - window._dotSmooth2d[idx]) * 0.22;
+          const scale = 1 + Math.max(0, Math.min(window._dotSmooth2d[idx], 1.5)) * 0.5;
+          const dot = window.dotsArr[idx];
+          if (dot) dot.style.transform = `scale(${scale})`;
+        }
       }
     }
   }
