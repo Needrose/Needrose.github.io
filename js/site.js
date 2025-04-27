@@ -251,6 +251,43 @@ document.addEventListener("DOMContentLoaded", function() {
   disableMouseCursor();
 });
 
+// --- Autoplay Popup Helper ---
+function showAutoplayPopup() {
+  // Remove any existing popup
+  let old = document.getElementById('autoplay-popup');
+  if (old) old.remove();
+  // Create popup
+  const popup = document.createElement('div');
+  popup.id = 'autoplay-popup';
+  popup.innerHTML = `
+    <span style="margin-right:8px;"><i class="fa-solid fa-volume-xmark"></i></span>
+    Please enable autoplay or interact with the page to start music!
+  `;
+  popup.style.position = 'fixed';
+  popup.style.right = '32px';
+  popup.style.bottom = '32px';
+  popup.style.background = 'rgba(31, 31, 46, 0.97)';
+  popup.style.color = '#fff';
+  popup.style.fontFamily = "'Segoe UI', sans-serif";
+  popup.style.fontSize = '1.08rem';
+  popup.style.padding = '16px 28px';
+  popup.style.borderRadius = '14px';
+  popup.style.boxShadow = '0 4px 24px 0 #a855f7aa, 0 0 0 2px #a855f7';
+  popup.style.zIndex = 999999;
+  popup.style.display = 'flex';
+  popup.style.alignItems = 'center';
+  popup.style.gap = '8px';
+  popup.style.opacity = '0';
+  popup.style.transition = 'opacity 0.4s';
+
+  document.body.appendChild(popup);
+  setTimeout(() => { popup.style.opacity = '1'; }, 10);
+  setTimeout(() => {
+    popup.style.opacity = '0';
+    setTimeout(() => popup.remove(), 600);
+  }, 4000);
+}
+
 // --- Audio Player Functionality ---
 document.addEventListener("DOMContentLoaded", function() {
   // Playlist with per-song cover art
@@ -314,11 +351,19 @@ document.addEventListener("DOMContentLoaded", function() {
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
+    // Try to play, handle autoplay block
     audio.play().catch(() => {
-      // Autoplay blocked, wait for user interaction
+      showAutoplayPopup();
+      // Wait for user interaction, then try again
       const tryPlay = () => {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-        audio.play();
+        audio.play().then(() => {
+          // Success: remove popup if still present
+          let popup = document.getElementById('autoplay-popup');
+          if (popup) popup.remove();
+        }).catch(() => {
+          // Still blocked, keep popup
+        });
         document.removeEventListener('click', tryPlay);
         document.removeEventListener('keydown', tryPlay);
       };

@@ -885,3 +885,14 @@ footer {
 .player__icon-play:before { content: "\f04b"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
 .player__icon-next:before { content: "\f051"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
 .player__icon-shuffle:before { content: "\f074"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+
+/* Autoplay popup styles */
+#autoplay-popup {
+  pointer-events: none;
+  user-select: none;
+  animation: popup-fadein 0.4s;
+}
+@keyframes popup-fadein {
+  from { opacity: 0; transform: translateY(30px);}
+  to { opacity: 1; transform: translateY(0);}
+}
